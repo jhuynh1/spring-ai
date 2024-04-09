@@ -37,8 +37,10 @@ public class GemFireVectorStoreAutoConfiguration {
 	@Bean
 	@ConditionalOnMissingBean
 	public GemFireVectorStore vectorStore(EmbeddingClient embeddingClient, GemFireVectorStoreProperties properties) {
-
-		var config = GemFireVectorStore.GemFireVectorStoreConfig.builder().build();
+		var config = GemFireVectorStore.GemFireVectorStoreConfig.builder()
+			.withHost(properties.getHost())
+			.withPort(properties.getPort())
+			.build();
 		GemFireVectorStore gemFireVectorStore = new GemFireVectorStore(config, embeddingClient);
 		gemFireVectorStore.setIndexName(properties.getIndexName());
 		return gemFireVectorStore;

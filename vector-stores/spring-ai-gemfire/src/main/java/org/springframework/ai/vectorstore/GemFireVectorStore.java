@@ -58,13 +58,21 @@ public class GemFireVectorStore implements VectorStore {
 
 	private static final String EMBEDDINGS = "/embeddings";
 
+	private static final String[] DEFAULT_VECTOR_FIELD = new String[] { "vector" };
+
+	private static final int DEFAULT_BEAM_WIDTH = 100;
+
+	private static final String DEFAULT_SIMILARITY_FUNCTION = "COSINE";
+
+	private static final int DEFAULT_BUCKET = 0;
+
+	private static final int DEFAULT_CONNECTION = 16;
+
 	private final WebClient client;
 
 	private final EmbeddingClient embeddingClient;
 
 	private final int topKPerBucket;
-
-	private final int topK;
 
 	private final String documentField;
 
@@ -200,29 +208,28 @@ public class GemFireVectorStore implements VectorStore {
 		this.client = config.client;
 		this.embeddingClient = embedding;
 		this.topKPerBucket = config.topKPerBucket;
-		this.topK = config.topK;
 		this.documentField = config.documentField;
 	}
 
-	private static final class CreateRequest {
+	public static class CreateRequest {
 
 		@JsonProperty("name")
 		private String name;
 
 		@JsonProperty("beam-width")
-		private int beamWidth = 100;
+		private int beamWidth = DEFAULT_BEAM_WIDTH;
 
 		@JsonProperty("max-connections")
-		private int maxConnections = 16;
+		private int maxConnections = DEFAULT_CONNECTION;
 
 		@JsonProperty("vector-similarity-function")
-		private String vectorSimilarityFunction = "COSINE";
+		private String vectorSimilarityFunction = DEFAULT_SIMILARITY_FUNCTION;
 
 		@JsonProperty("fields")
-		private String[] fields = new String[] { "vector" };
+		private String[] fields = DEFAULT_VECTOR_FIELD;
 
 		@JsonProperty("buckets")
-		private int buckets = 0;
+		private int buckets = DEFAULT_BUCKET;
 
 		public CreateRequest() {
 		}
@@ -490,6 +497,22 @@ public class GemFireVectorStore implements VectorStore {
 
 	public void createIndex(String indexName) throws JsonProcessingException {
 		CreateRequest createRequest = new CreateRequest(indexName);
+		// Check if custom values are provided, otherwise set default values
+		if (createRequest.getFields() != DEFAULT_VECTOR_FIELD) {
+			createRequest.setFields(DEFAULT_VECTOR_FIELD);
+		}
+		if (createRequest.getBeamWidth() != DEFAULT_BEAM_WIDTH) {
+			createRequest.setBeamWidth(DEFAULT_BEAM_WIDTH);
+		}
+		if (createRequest.getMaxConnections() != DEFAULT_CONNECTION) {
+			createRequest.setMaxConnections(DEFAULT_CONNECTION);
+		}
+		if (createRequest.getBuckets() != DEFAULT_BUCKET) {
+			createRequest.setBuckets(DEFAULT_BUCKET);
+		}
+		if (!createRequest.getVectorSimilarityFunction().equals(DEFAULT_SIMILARITY_FUNCTION)) {
+			createRequest.setVectorSimilarityFunction(DEFAULT_SIMILARITY_FUNCTION);
+		}
 		ObjectMapper objectMapper = new ObjectMapper();
 		String index = objectMapper.writeValueAsString(createRequest);
 		client.post()

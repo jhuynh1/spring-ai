@@ -37,7 +37,6 @@ import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * @author Geet Rawat
@@ -55,11 +54,21 @@ class GemFireVectorStoreAutoConfigurationIT {
 	private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
 		.withConfiguration(AutoConfigurations.of(GemFireVectorStoreAutoConfiguration.class))
 		.withUserConfiguration(Config.class)
-		.withPropertyValues("spring.ai.vectorstore.gemfire.indexName=spring-ai-index");
+		.withPropertyValues("spring.ai.vectorstore.gemfire.indexName=spring-ai-index")
+		.withPropertyValues("spring.ai.vectorstore.gemfire.host=localhost")
+		.withPropertyValues("spring.ai.vectorstore.gemfire.port=9090");
 
 	@BeforeEach
 	public void createIndex() {
-		contextRunner.run(c -> c.getBean(GemFireVectorStore.class).createIndex(INDEX_NAME));
+		contextRunner.run(c -> {
+			GemFireVectorStoreProperties properties = c.getBean(GemFireVectorStoreProperties.class);
+			properties.setFields(new String[] { "vector1" });
+			properties.setBeamWidth(100);
+			properties.setMaxConnections(16);
+			properties.setBuckets(10);
+			properties.setVectorSimilarityFunction("COSINE");
+			c.getBean(GemFireVectorStore.class).createIndex(INDEX_NAME);
+		});
 	}
 
 	@AfterEach
@@ -70,31 +79,33 @@ class GemFireVectorStoreAutoConfigurationIT {
 	@Test
 	public void addAndSearchTest() {
 
-		contextRunner.withPropertyValues("spring.ai.vectorstore.gemfire.indexName=" + INDEX_NAME).run(context -> {
-			VectorStore vectorStore = context.getBean(VectorStore.class);
-			vectorStore.add(documents);
+		contextRunner.
+		// withPropertyValues("spring.ai.vectorstore.gemfire.indexName=" + INDEX_NAME)
+			run(context -> {
+				VectorStore vectorStore = context.getBean(VectorStore.class);
+				vectorStore.add(documents);
 
-			Awaitility.await().until(() -> {
-				return vectorStore.similaritySearch(SearchRequest.query("Spring").withTopK(1));
-			}, hasSize(1));
+				Awaitility.await().until(() -> {
+					return vectorStore.similaritySearch(SearchRequest.query("Spring").withTopK(1));
+				}, hasSize(1));
 
-			List<Document> results = vectorStore.similaritySearch(SearchRequest.query("Spring").withTopK(1));
+				List<Document> results = vectorStore.similaritySearch(SearchRequest.query("Spring").withTopK(1));
 
-			assertThat(results).hasSize(1);
-			Document resultDoc = results.get(0);
-			assertThat(resultDoc.getId()).isEqualTo(documents.get(0).getId());
-			assertThat(resultDoc.getContent()).contains(
-					"Spring AI provides abstractions that serve as the foundation for developing AI applications.");
-			assertThat(resultDoc.getMetadata()).hasSize(2);
-			assertThat(resultDoc.getMetadata()).containsKeys("spring", "distance");
+				assertThat(results).hasSize(1);
+				Document resultDoc = results.get(0);
+				assertThat(resultDoc.getId()).isEqualTo(documents.get(0).getId());
+				assertThat(resultDoc.getContent()).contains(
+						"Spring AI provides abstractions that serve as the foundation for developing AI applications.");
+				assertThat(resultDoc.getMetadata()).hasSize(2);
+				assertThat(resultDoc.getMetadata()).containsKeys("spring", "distance");
 
-			// Remove all documents from the store
-			vectorStore.delete(documents.stream().map(doc -> doc.getId()).toList());
+				// Remove all documents from the store
+				vectorStore.delete(documents.stream().map(doc -> doc.getId()).toList());
 
-			Awaitility.await().until(() -> {
-				return vectorStore.similaritySearch(SearchRequest.query("Spring").withTopK(1));
-			}, hasSize(0));
-		});
+				Awaitility.await().until(() -> {
+					return vectorStore.similaritySearch(SearchRequest.query("Spring").withTopK(1));
+				}, hasSize(0));
+			});
 	}
 
 	@Configuration(proxyBeanMethods = false)

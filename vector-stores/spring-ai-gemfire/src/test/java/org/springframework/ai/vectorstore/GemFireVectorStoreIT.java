@@ -185,7 +185,12 @@ public class GemFireVectorStoreIT {
 
 		@Bean
 		public GemFireVectorStoreConfig gemfireVectorStoreConfig() {
-			return GemFireVectorStoreConfig.builder().withHost("localhost").build();
+			return GemFireVectorStoreConfig.builder()
+				.withHost("localhost")
+				.withPort(9090)
+				.withConnectionTimeout(100)
+				.withRequestTimeout(100)
+				.build();
 		}
 
 		@Bean
