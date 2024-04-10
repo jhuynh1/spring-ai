@@ -39,10 +39,15 @@ public class GemFireVectorStoreAutoConfiguration {
 	public GemFireVectorStore vectorStore(EmbeddingClient embeddingClient, GemFireVectorStoreProperties properties) {
 		var config = GemFireVectorStore.GemFireVectorStoreConfig.builder()
 			.withHost(properties.getHost())
+			.withIndexName(properties.getIndexName())
 			.withPort(properties.getPort())
+			.withBeamWidth(properties.getBeamWidth())
+			.withMaxConnections(properties.getMaxConnections())
+			.withBuckets(properties.getBuckets())
+			.withVectorSimilarityFunction(properties.getVectorSimilarityFunction())
+			.withFields(properties.getFields())
 			.build();
 		GemFireVectorStore gemFireVectorStore = new GemFireVectorStore(config, embeddingClient);
-		gemFireVectorStore.setIndexName(properties.getIndexName());
 		return gemFireVectorStore;
 	}
 

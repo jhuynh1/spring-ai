@@ -152,24 +152,28 @@ public class GemFireVectorStoreIT {
 
 		contextRunner.run(context -> {
 			VectorStore vectorStore = context.getBean(VectorStore.class);
-			vectorStore.add(documents);
+			System.out.println("JASON VECTOR STORE" + ((GemFireVectorStore) vectorStore).indexName);
 
+			vectorStore.add(documents);
 			Awaitility.await().atMost(1, MINUTES).until(() -> {
 				return vectorStore
 					.similaritySearch(SearchRequest.query("Great Depression").withTopK(5).withSimilarityThresholdAll());
 			}, hasSize(3));
+			System.out.println("JASON 2");
 
 			List<Document> fullResult = vectorStore
 				.similaritySearch(SearchRequest.query("Depression").withTopK(5).withSimilarityThresholdAll());
 
 			List<Float> distances = fullResult.stream().map(doc -> (Float) doc.getMetadata().get("distance")).toList();
 			assertThat(distances).hasSize(3);
+			System.out.println("JASON 3");
 
 			float threshold = (distances.get(0) + distances.get(1)) / 2;
 			List<Document> results = vectorStore
 				.similaritySearch(SearchRequest.query("Depression").withTopK(5).withSimilarityThreshold(1 - threshold));
 
 			assertThat(results).hasSize(1);
+			System.out.println("JASON 4");
 
 			Document resultDoc = results.get(0);
 			assertThat(resultDoc.getId()).isEqualTo(documents.get(2).getId());
@@ -188,6 +192,7 @@ public class GemFireVectorStoreIT {
 			return GemFireVectorStoreConfig.builder()
 				.withHost("localhost")
 				.withPort(9090)
+				.withIndexName(INDEX_NAME)
 				.withConnectionTimeout(100)
 				.withRequestTimeout(100)
 				.build();
@@ -196,7 +201,6 @@ public class GemFireVectorStoreIT {
 		@Bean
 		public GemFireVectorStore vectorStore(GemFireVectorStoreConfig config, EmbeddingClient embeddingClient) {
 			GemFireVectorStore gemFireVectorStore = new GemFireVectorStore(config, embeddingClient);
-			gemFireVectorStore.setIndexName(INDEX_NAME);
 			return gemFireVectorStore;
 		}
 

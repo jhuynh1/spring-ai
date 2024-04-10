@@ -32,6 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.embedding.EmbeddingClient;
+import org.springframework.beans.factory.InitializingBean;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.util.Assert;
@@ -40,6 +41,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
+
 import reactor.util.annotation.NonNull;
 
 /**
@@ -48,43 +50,72 @@ import reactor.util.annotation.NonNull;
  *
  * @author Geet Rawat
  */
-public class GemFireVectorStore implements VectorStore {
-
-	public static final String QUERY = "/query";
+public class GemFireVectorStore implements VectorStore, InitializingBean {
 
 	private static final Logger logger = LoggerFactory.getLogger(GemFireVectorStore.class);
 
-	private static final String DISTANCE_METADATA_FIELD_NAME = "distance";
+	private static final int DEFAULT_PORT = 8080;
+
+	private static final String DEFAULT_HOST = "localhost";
+
+	public static final String DEFAULT_URI = "http{ssl}://{host}:{port}/gemfire-vectordb/v1/indexes";
 
 	private static final String EMBEDDINGS = "/embeddings";
-
-	private static final String[] DEFAULT_VECTOR_FIELD = new String[] { "vector" };
-
-	private static final int DEFAULT_BEAM_WIDTH = 100;
-
-	private static final String DEFAULT_SIMILARITY_FUNCTION = "COSINE";
-
-	private static final int DEFAULT_BUCKET = 0;
-
-	private static final int DEFAULT_CONNECTION = 16;
 
 	private final WebClient client;
 
 	private final EmbeddingClient embeddingClient;
 
-	private final int topKPerBucket;
+	// Create Index DEFAULT Values
+
+	private static final String[] DEFAULT_VECTOR_FIELD = new String[] { "vector" };
+
+	private static final String DEFAULT_SIMILARITY_FUNCTION = "COSINE";
+
+	private static final int DEFAULT_BEAM_WIDTH = 100;
+
+	private static final int DEFAULT_BUCKETS = 0;
+
+	private static final int DEFAULT_CONNECTION = 16;
+
+	private static final String DEFAULT_DOCUMENT_FIELD = "document";
+
+	// Create Index Parameters
+
+	public String indexName;
+
+	private int beamWidth;
+
+	private int maxConnections;
+
+	private int buckets;
+
+	private String vectorSimilarityFunction;
+
+	private String[] fields;
 
 	private final String documentField;
+
+	// Query Defaults
+	public static final String QUERY = "/query";
+
+	private static final String DISTANCE_METADATA_FIELD_NAME = "distance";
 
 	public static final class GemFireVectorStoreConfig {
 
 		private final WebClient client;
 
-		private final String index;
+		private final String indexName;
 
-		private final int topKPerBucket;
+		private final int beamWidth;
 
-		public final int topK;
+		private final int maxConnections;
+
+		private final String vectorSimilarityFunction;
+
+		private String[] fields;
+
+		private final int buckets;
 
 		private final String documentField;
 
@@ -96,10 +127,13 @@ public class GemFireVectorStore implements VectorStore {
 			String base = UriComponentsBuilder.fromUriString(DEFAULT_URI)
 				.build(builder.sslEnabled ? "s" : "", builder.host, builder.port)
 				.toString();
-			this.index = builder.index;
+			this.indexName = builder.indexName;
 			this.client = WebClient.create(base);
-			this.topKPerBucket = builder.topKPerBucket;
-			this.topK = builder.topK;
+			this.beamWidth = builder.beamWidth;
+			this.maxConnections = builder.maxConnections;
+			this.buckets = builder.buckets;
+			this.vectorSimilarityFunction = builder.vectorSimilarityFunction;
+			this.fields = builder.fields;
 			this.documentField = builder.documentField;
 		}
 
@@ -115,11 +149,17 @@ public class GemFireVectorStore implements VectorStore {
 
 			private long requestTimeout;
 
-			private String index;
+			private String indexName;
 
-			private int topKPerBucket = DEFAULT_TOP_K_PER_BUCKET;
+			private int beamWidth = DEFAULT_BEAM_WIDTH;
 
-			private int topK = DEFAULT_TOP_K;
+			private int maxConnections = DEFAULT_CONNECTION;
+
+			private int buckets = DEFAULT_BUCKETS;
+
+			private String vectorSimilarityFunction = DEFAULT_SIMILARITY_FUNCTION;
+
+			private String[] fields = DEFAULT_VECTOR_FIELD;
 
 			private String documentField = DEFAULT_DOCUMENT_FIELD;
 
@@ -152,21 +192,40 @@ public class GemFireVectorStore implements VectorStore {
 				return this;
 			}
 
-			public Builder withIndex(String index) {
-				Assert.hasText(index, "index must have a value");
-				this.index = index;
+			public Builder withIndexName(String indexName) {
+				Assert.hasText(indexName, "indexName must have a value");
+				this.indexName = indexName;
 				return this;
 			}
 
-			public Builder withTopKPerBucket(int topKPerBucket) {
-				Assert.isTrue(topKPerBucket > 0, "topKPerBucket must be positive");
-				this.topKPerBucket = topKPerBucket;
+			public Builder withBeamWidth(int beamWidth) {
+				Assert.isTrue(beamWidth > 0, "beamWidth must be positive");
+				Assert.isTrue(beamWidth < 3200, "beamWidth must be less than 3200");
+				this.beamWidth = beamWidth;
 				return this;
 			}
 
-			public Builder withTopK(int topK) {
-				Assert.isTrue(topK > 0, "topK must be positive");
-				this.topK = topK;
+			public Builder withMaxConnections(int maxConnections) {
+				Assert.isTrue(maxConnections > 0, "maxConnections must be positive");
+				Assert.isTrue(maxConnections <= 512, "maxConnections must be less than 512");
+				this.maxConnections = maxConnections;
+				return this;
+			}
+
+			public Builder withBuckets(int buckets) {
+				Assert.isTrue(buckets >= 0, "bucket must be positive");
+				this.buckets = buckets;
+				return this;
+			}
+
+			public Builder withVectorSimilarityFunction(String vectorSimilarityFunction) {
+				Assert.hasText(vectorSimilarityFunction, "vectorSimilarityFunction must have a value");
+				this.vectorSimilarityFunction = vectorSimilarityFunction;
+				return this;
+			}
+
+			public Builder withFields(String[] fields) {
+				this.fields = fields;
 				return this;
 			}
 
@@ -184,37 +243,24 @@ public class GemFireVectorStore implements VectorStore {
 
 	}
 
-	private static final int DEFAULT_PORT = 9090;
-
-	private static final String DEFAULT_HOST = "localhost";
-
-	public static final String DEFAULT_URI = "http{ssl}://{host}:{port}/gemfire-vectordb/v1/indexes";
-
-	private static final int DEFAULT_TOP_K_PER_BUCKET = 10;
-
-	private static final int DEFAULT_TOP_K = 10;
-
-	private static final String DEFAULT_DOCUMENT_FIELD = "document";
-
-	public String indexName;
-
-	public void setIndexName(String indexName) {
-		this.indexName = indexName;
-	}
-
 	public GemFireVectorStore(GemFireVectorStoreConfig config, EmbeddingClient embedding) {
 		Assert.notNull(config, "GemFireVectorStoreConfig must not be null");
 		Assert.notNull(embedding, "EmbeddingClient must not be null");
 		this.client = config.client;
+		this.indexName = config.indexName;
 		this.embeddingClient = embedding;
-		this.topKPerBucket = config.topKPerBucket;
+		this.beamWidth = config.beamWidth;
+		this.maxConnections = config.maxConnections;
+		this.buckets = config.buckets;
+		this.vectorSimilarityFunction = config.vectorSimilarityFunction;
+		this.fields = config.fields;
 		this.documentField = config.documentField;
 	}
 
 	public static class CreateRequest {
 
 		@JsonProperty("name")
-		private String name;
+		private String indexName;
 
 		@JsonProperty("beam-width")
 		private int beamWidth = DEFAULT_BEAM_WIDTH;
@@ -229,21 +275,21 @@ public class GemFireVectorStore implements VectorStore {
 		private String[] fields = DEFAULT_VECTOR_FIELD;
 
 		@JsonProperty("buckets")
-		private int buckets = DEFAULT_BUCKET;
+		private int buckets = DEFAULT_BUCKETS;
 
 		public CreateRequest() {
 		}
 
-		public CreateRequest(String name) {
-			this.name = name;
+		public CreateRequest(String indexName) {
+			this.indexName = indexName;
 		}
 
-		public String getName() {
-			return name;
+		public String getIndexName() {
+			return indexName;
 		}
 
-		public void setName(String name) {
-			this.name = name;
+		public void setIndexName(String indexName) {
+			this.indexName = indexName;
 		}
 
 		public int getBeamWidth() {
@@ -472,15 +518,17 @@ public class GemFireVectorStore implements VectorStore {
 	@Override
 	public List<Document> similaritySearch(SearchRequest request) {
 		if (request.hasFilterExpression()) {
-			throw new UnsupportedOperationException("Gemfire does not support metadata filter expressions yet.");
+			throw new UnsupportedOperationException("GemFire currently does not support metadata filter expressions.");
 		}
 		List<Double> vector = this.embeddingClient.embed(request.getQuery());
 		List<Float> floatVector = vector.stream().map(Double::floatValue).toList();
-
+		System.out.println("JASON:" + indexName);
 		return client.post()
 			.uri("/" + indexName + QUERY)
 			.contentType(MediaType.APPLICATION_JSON)
-			.bodyValue(new QueryRequest(floatVector, request.getTopK(), topKPerBucket, true))
+			.bodyValue(new QueryRequest(floatVector, request.getTopK(), request.getTopK() /*
+																							 * TopKPerBucket
+																							 */, true))
 			.retrieve()
 			.bodyToFlux(QueryResponse.class)
 			.filter(r -> r.score >= request.getSimilarityThreshold())
@@ -497,24 +545,16 @@ public class GemFireVectorStore implements VectorStore {
 
 	public void createIndex(String indexName) throws JsonProcessingException {
 		CreateRequest createRequest = new CreateRequest(indexName);
-		// Check if custom values are provided, otherwise set default values
-		if (createRequest.getFields() != DEFAULT_VECTOR_FIELD) {
-			createRequest.setFields(DEFAULT_VECTOR_FIELD);
-		}
-		if (createRequest.getBeamWidth() != DEFAULT_BEAM_WIDTH) {
-			createRequest.setBeamWidth(DEFAULT_BEAM_WIDTH);
-		}
-		if (createRequest.getMaxConnections() != DEFAULT_CONNECTION) {
-			createRequest.setMaxConnections(DEFAULT_CONNECTION);
-		}
-		if (createRequest.getBuckets() != DEFAULT_BUCKET) {
-			createRequest.setBuckets(DEFAULT_BUCKET);
-		}
-		if (!createRequest.getVectorSimilarityFunction().equals(DEFAULT_SIMILARITY_FUNCTION)) {
-			createRequest.setVectorSimilarityFunction(DEFAULT_SIMILARITY_FUNCTION);
-		}
+		createRequest.setBeamWidth(beamWidth);
+		createRequest.setMaxConnections(maxConnections);
+		createRequest.setBuckets(buckets);
+		createRequest.setVectorSimilarityFunction(vectorSimilarityFunction);
+		createRequest.setFields(fields);
+
 		ObjectMapper objectMapper = new ObjectMapper();
 		String index = objectMapper.writeValueAsString(createRequest);
+		System.out.println("JASON trying to create index:" + index);
+
 		client.post()
 			.contentType(MediaType.APPLICATION_JSON)
 			.bodyValue(index)
@@ -526,7 +566,6 @@ public class GemFireVectorStore implements VectorStore {
 
 	public void deleteIndex(String indexName) {
 		DeleteRequest deleteRequest = new DeleteRequest();
-		deleteRequest.setDeleteData(true);
 		client.method(HttpMethod.DELETE)
 			.uri("/" + indexName)
 			.body(BodyInserters.fromValue(deleteRequest))
@@ -550,6 +589,13 @@ public class GemFireVectorStore implements VectorStore {
 		else {
 			throw new RuntimeException(String.format("Got an unexpected HTTP error: %s", ex));
 		}
+	}
+
+	@Override
+	public void afterPropertiesSet() {
+		// if (!exists(this.indexName)) {
+		// createIndex(this.indexName);
+		// }
 	}
 
 }
