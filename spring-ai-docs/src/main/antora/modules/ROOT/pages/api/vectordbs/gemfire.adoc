@@ -96,6 +96,8 @@ public GemFireVectorStore vectorStore(EmbeddingModel embeddingModel) {
     return GemFireVectorStore.builder(embeddingModel)
         .host("localhost")
         .port(7071)
+        .username("my-user-name")
+        .password("my-password")
         .indexName("my-vector-index")
         .fields(new String[] {"country", "year", "activationDate"}) // Optional: fields for metadata filtering
         .initializeSchema(true)
