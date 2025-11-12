@@ -40,4 +40,5 @@ public interface GemFireConnectionDetails extends ConnectionDetails {
 	default String getToken() {
 		return null;
 	}
+
 }

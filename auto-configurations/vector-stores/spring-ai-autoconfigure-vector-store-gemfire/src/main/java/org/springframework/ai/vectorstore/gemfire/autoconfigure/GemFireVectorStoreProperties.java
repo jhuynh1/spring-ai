@@ -189,7 +189,7 @@ public class GemFireVectorStoreProperties extends CommonVectorStoreProperties {
 	}
 
 	public String getToken() {
-		return token;
+		return this.token;
 	}
 
 	public void setToken(String token) {
@@ -197,7 +197,7 @@ public class GemFireVectorStoreProperties extends CommonVectorStoreProperties {
 	}
 
 	public String getPassword() {
-		return password;
+		return this.password;
 	}
 
 	public void setPassword(String password) {
@@ -205,13 +205,11 @@ public class GemFireVectorStoreProperties extends CommonVectorStoreProperties {
 	}
 
 	public String getUsername() {
-		return username;
+		return this.username;
 	}
 
 	public void setUsername(String username) {
 		this.username = username;
 	}
-
-
 
 }

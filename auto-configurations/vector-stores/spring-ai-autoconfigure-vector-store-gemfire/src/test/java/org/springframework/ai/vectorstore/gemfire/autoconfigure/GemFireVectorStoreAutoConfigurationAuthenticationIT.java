@@ -97,7 +97,7 @@ class GemFireVectorStoreAutoConfigurationAuthenticationIT {
 		gemFireCluster = new GemFireCluster("gemfire/gemfire-all:10.1-jdk17", LOCATOR_COUNT, SERVER_COUNT);
 		gemFireCluster.withConfiguration(GemFireCluster.SERVER_GLOB,
 				container -> container.withExposedPorts(HTTP_SERVICE_PORT)
-						.withCreateContainerCmdModifier(cmd -> cmd.getHostConfig().withPortBindings(mappedPort)));
+					.withCreateContainerCmdModifier(cmd -> cmd.getHostConfig().withPortBindings(mappedPort)));
 		gemFireCluster.withGemFireProperty(GemFireCluster.SERVER_GLOB, "http-service-port",
 				Integer.toString(HTTP_SERVICE_PORT));
 		gemFireCluster.withGemFireProperty(GemFireCluster.ALL_GLOB, "security-manager",
@@ -110,6 +110,7 @@ class GemFireVectorStoreAutoConfigurationAuthenticationIT {
 		System.setProperty("spring.data.gemfire.pool.locators",
 				String.format("localhost[%d]", gemFireCluster.getLocatorPort()));
 	}
+
 	@Test
 	void ensureGemFireVectorStoreCustomConfiguration() {
 		this.contextRunner.run(context -> {

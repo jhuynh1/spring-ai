@@ -81,9 +81,9 @@ public class GemFireVectorStoreAutoConfiguration {
 			.observationRegistry(observationRegistry.getIfUnique(() -> ObservationRegistry.NOOP))
 			.customObservationConvention(customObservationConvention.getIfAvailable(() -> null))
 			.batchingStrategy(batchingStrategy)
-				.username(gemFireConnectionDetails.getUsername())
-				.password(gemFireConnectionDetails.getPassword())
-				.token(gemFireConnectionDetails.getToken())
+			.username(gemFireConnectionDetails.getUsername())
+			.password(gemFireConnectionDetails.getPassword())
+			.token(gemFireConnectionDetails.getToken())
 			.build();
 	}
 
@@ -118,6 +118,8 @@ public class GemFireVectorStoreAutoConfiguration {
 		@Override
 		public String getToken() {
 			return this.properties.getToken();
-		}}
+		}
+
+	}
 
 }
