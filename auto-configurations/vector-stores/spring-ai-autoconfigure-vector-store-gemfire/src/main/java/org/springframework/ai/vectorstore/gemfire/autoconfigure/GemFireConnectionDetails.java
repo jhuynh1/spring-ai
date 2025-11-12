@@ -29,4 +29,15 @@ public interface GemFireConnectionDetails extends ConnectionDetails {
 
 	int getPort();
 
+	default String getUsername() {
+		return null;
+	}
+
+	default String getPassword() {
+		return null;
+	}
+
+	default String getToken() {
+		return null;
+	}
 }
